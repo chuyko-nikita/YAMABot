@@ -4,8 +4,8 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext
 from yandex_music import Client
 
-TELEGRAM_BOT_TOKEN = os.environ.get('7796497784:AAF-DvoHqlhZO1RmFDcF27ZKOjsLCjAyT9E')
-YANDEX_MUSIC_TOKEN = os.environ.get('y0_AgAAAAAhRQQbAAG8XgAAAAEWC1zcAABJNcOLbJRM_qAP_llcx7MEZFwFzg' )
+TELEGRAM_BOT_TOKEN = '7796497784:AAF-DvoHqlhZO1RmFDcF27ZKOjsLCjAyT9E'
+YANDEX_MUSIC_TOKEN = 'y0_AgAAAAAhRQQbAAG8XgAAAAEWC1zcAABJNcOLbJRM_qAP_llcx7MEZFwFzg' 
 
 try:
   client = Client(YANDEX_MUSIC_TOKEN).init()
@@ -62,4 +62,5 @@ def main() -> None:
 
   app.run_polling()
 
+if __name__ == '__main__':
   main()
