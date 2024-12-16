@@ -4,10 +4,12 @@ import asyncio
 import io
 from mutagen import File
 from mutagen.id3 import TIT2, TPE1, TALB, APIC, TDRC, USLT
-from yandex_music import Client, Playlist, SearchResult
+from yandex_music import Client, Playlist, SearchResult, Album
 from yandex_music.exceptions import YandexMusicError
-from telegram import Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message # Добавлено
+from telegram import Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext, CallbackQueryHandler
+
+
 
 TELEGRAM_BOT_TOKEN = '7796497784:AAF-DvoHqlhZO1RmFDcF27ZKOjsLCjAyT9E'
 YANDEX_MUSIC_TOKEN = 'y0_AgAAAAAhRQQbAAG8XgAAAAEWC1zcAABJNcOLbJRM_qAP_llcx7MEZFwFzg'
@@ -25,15 +27,15 @@ def extract_track_id(text: str) -> str:
     match = re.search(r'(\d+)', text)  # Попытка извлечь track_id из текста кнопки
     if match:
         return match.group(1)
-    return None #Возвращение None
+    return None
+
+def extract_album_id(text: str) -> str:
+    match = re.search(r'/album/(\d+)', text)
+    if match:
+        return match.group(1)
+    return None
 
 async def download_and_send_track(message: Message, context: CallbackContext, track_id: str):
-    if message is None:
-        print("Ошибка: message равен None в download_and_send_track")
-        return
-
-    print(f"Type of message in download_and_send_track: {type(message)}")  # Для отладки
-
     try:
         client = Client(YANDEX_MUSIC_TOKEN).init()
         track = client.tracks([track_id])[0]
@@ -57,7 +59,6 @@ async def download_and_send_track(message: Message, context: CallbackContext, tr
         else:
             print("Не удалось скачать трек.")
             return
-
         cover_filename = file_name + ".jpg"
         try:
             track.download_cover(cover_filename, size="300x300")
@@ -96,7 +97,29 @@ async def download_and_send_track(message: Message, context: CallbackContext, tr
         print(f"Полное исключение: {e}")
 
 
-async def search_track(update: Update, context: CallbackContext) -> None:
+async def send_album_tracks(message: Message, context: CallbackContext, album_id: str):
+    try:
+        client = Client(YANDEX_MUSIC_TOKEN).init()
+        album = client.albums_with_tracks(album_id)
+
+        if album:
+            keyboard = []
+            for volume in album.volumes:
+                for track in volume:
+                    button = InlineKeyboardButton(
+                        text=f"{track.title} - {', '.join([artist.name for artist in track.artists])}",
+                        callback_data=track.track_id
+                    )
+                    keyboard.append([button])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await message.reply_text(f"Треки альбома '{album.title}':", reply_markup=reply_markup)
+        else:
+            await message.reply_text("Альбом не найден.")
+    except Exception as e:
+        await message.reply_text(f"Ошибка при обработке альбома: {e}")
+
+
+async def search_track_or_album(update: Update, context: CallbackContext) -> None:
     if update is None or update.message is None:
         print("Ошибка: update или update.message равны None в search_track")
         return
@@ -110,18 +133,26 @@ async def search_track(update: Update, context: CallbackContext) -> None:
     try:
         client = Client(YANDEX_MUSIC_TOKEN).init()
         search_result = client.search(query)
-        print(f"Количество треков: {search_result.tracks.total if search_result.tracks else 0}")
 
+        keyboard = []
         if search_result.tracks and search_result.tracks.total > 0:
-            keyboard = []
             for track in search_result.tracks.results[:5]:
                 button = InlineKeyboardButton(
-                    text=f"{track.title} - {', '.join([artist.name for artist in track.artists]) if track.artists else 'Неизвестный исполнитель'}",
+                    text=f"{track.title} - {', '.join([artist.name for artist in track.artists])}",
                     callback_data=track.track_id
                 )
                 keyboard.append([button])
+        if search_result.albums and search_result.albums.total > 0:
+            for album in search_result.albums.results[:5]:
+                button = InlineKeyboardButton(
+                    text=f"Альбом: {album.title} - {', '.join([artist.name for artist in album.artists])}",
+                    callback_data=f"album_{album.id}"  # Добавляем префикс "album_" для идентификации
+                )
+                keyboard.append([button])
+
+        if keyboard:
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text("Вот что мне удалось найти:", reply_markup=reply_markup)
+            await update.message.reply_text("Результаты поиска:", reply_markup=reply_markup)
         else:
             await update.message.reply_text("К сожалению, ничего не найдено.")
 
@@ -136,27 +167,31 @@ async def handle_message_or_callback(update: Update, context: CallbackContext) -
         query = update.callback_query
         message = query.message
         await query.answer()
-        track_id = query.data
+        data = query.data
+        if data.startswith("album_"):
+            album_id = data[6:]
+            await send_album_tracks(message, context, album_id)
+        else:
+            await download_and_send_track(message, context, data)
     elif isinstance(update, Update) and isinstance(update.message, Message):
         message = update.message
         track_id = extract_track_id(message.text)
+        album_id = extract_album_id(message.text)
+        if album_id:  # Сначала проверяем album_id
+            await send_album_tracks(message, context, album_id)
+        elif track_id:  # Затем проверяем track_id
+            await download_and_send_track(message, context, track_id)
+        else:
+            await message.reply_text("Не удалось извлечь ID трека или альбома.")
     else:
         return
-
-    if track_id:
-        try:
-            await download_and_send_track(message, context, track_id)
-        except Exception as e:
-            await message.reply_text(f"Ошибка при загрузке трека: {e}")
-    else:
-        await message.reply_text("Не удалось извлечь ID трека.")
 
 
 def main() -> None:
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", lambda update, context: update.message.reply_text("Привет! Отправьте ссылку на трек Яндекс.Музыки или используйте команду /search <запрос>.")))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'/search .+'), search_track))
+    app.add_handler(CommandHandler("start", lambda update, context: update.message.reply_text("Привет! Отправьте ссылку на трек или альбом Яндекс.Музыки или используйте команду /search <запрос>.")))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'/search .+'), search_track_or_album))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_or_callback))
     app.add_handler(CallbackQueryHandler(handle_message_or_callback))
 
