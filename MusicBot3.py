@@ -9,8 +9,6 @@ from yandex_music.exceptions import YandexMusicError
 from telegram import Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext, CallbackQueryHandler
 
-
-
 TELEGRAM_BOT_TOKEN = '7796497784:AAF-DvoHqlhZO1RmFDcF27ZKOjsLCjAyT9E'
 YANDEX_MUSIC_TOKEN = 'y0_AgAAAAAhRQQbAAG8XgAAAAEWC1zcAABJNcOLbJRM_qAP_llcx7MEZFwFzg'
 
