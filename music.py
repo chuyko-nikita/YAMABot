@@ -9,7 +9,6 @@ from yandex_music.exceptions import YandexMusicError
 from telegram import Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message # Добавлено
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext, CallbackQueryHandler
 
-
 TELEGRAM_BOT_TOKEN = '7796497784:AAF-DvoHqlhZO1RmFDcF27ZKOjsLCjAyT9E'
 YANDEX_MUSIC_TOKEN = 'y0_AgAAAAAhRQQbAAG8XgAAAAEWC1zcAABJNcOLbJRM_qAP_llcx7MEZFwFzg'
 
@@ -27,7 +26,6 @@ def extract_track_id(text: str) -> str:
     if match:
         return match.group(1)
     return None #Возвращение None
-
 
 async def download_and_send_track(message: Message, context: CallbackContext, track_id: str):
     if message is None:
