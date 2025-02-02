@@ -23,3 +23,7 @@ mutagen
 ```
 
 Протестировать: https://t.me/musicyanagl8_bot
+
+Также, вам понадобится получить токен Яндекс.Музыки, как это сделать, подробно описано [в документации библиотеки](https://yandex-music.readthedocs.io/en/main/token.html)
+
+@MarshalX cпасибо!
