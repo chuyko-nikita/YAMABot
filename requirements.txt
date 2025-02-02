@@ -1,2 +1,5 @@
-python-telegram-bot
+python-telegram-bot==20.2.0  # Или другая версия >= 20.0
 yandex-music
+requests
+Pillow
+mutagen
