@@ -1,7 +1,7 @@
 import os
 import re
 import asyncio
-import io
+from io import BytesIO
 from mutagen import File
 from mutagen.id3 import TIT2, TPE1, TALB, APIC, TDRC, USLT
 from yandex_music import Client, Playlist, SearchResult, Album
@@ -15,7 +15,6 @@ YANDEX_MUSIC_TOKEN = os.getenv('YANDEX_MUSIC_TOKEN')
 if TELEGRAM_BOT_TOKEN is None or YANDEX_MUSIC_TOKEN is None:
     raise ValueError("Один или оба токена не установлены в переменных окружения!")
 
-
 DELIMITER = "/"
 
 def strip_bad_symbols(text: str) -> str:
@@ -23,18 +22,28 @@ def strip_bad_symbols(text: str) -> str:
     return result
 
 def extract_track_id(text: str) -> str:
-    match = re.search(r'/track/(\d+)', text)
-    if match:
-        return match.group(1)
-    match = re.search(r'(\d+)', text)  # Попытка извлечь track_id из текста кнопки
-    if match:
-        return match.group(1)
+    patterns = [
+        r'https?://music\.yandex\.ru/album/\d+/track/(\d+)(?:\?.*)?',
+        r'https?://music\.yandex\.ru/track/(\d+)(?:\?.*)?',
+        r'/track/(\d+)(?:\?.*)?',
+        r'track/(\d+)(?:\?.*)?',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
     return None
 
 def extract_album_id(text: str) -> str:
-    match = re.search(r'/album/(\d+)', text)
-    if match:
-        return match.group(1)
+    patterns = [
+        r'https?://music\.yandex\.ru/album/(\d+)(?:\?.*)?',
+        r'/album/(\d+)(?:\?.*)?',
+        r'album/(\d+)(?:\?.*)?',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
     return None
 
 async def download_and_send_track(message: Message, context: CallbackContext, track_id: str):
@@ -98,7 +107,6 @@ async def download_and_send_track(message: Message, context: CallbackContext, tr
         await message.reply_text(f"Ошибка: {e}")
         print(f"Полное исключение: {e}")
 
-
 async def send_album_tracks(message: Message, context: CallbackContext, album_id: str):
     try:
         client = Client(YANDEX_MUSIC_TOKEN).init()
@@ -120,15 +128,9 @@ async def send_album_tracks(message: Message, context: CallbackContext, album_id
     except Exception as e:
         await message.reply_text(f"Ошибка при обработке альбома: {e}")
 
-
-async def search_track_or_album(update: Update, context: CallbackContext) -> None:
-    if update is None or update.message is None:
-        print("Ошибка: update или update.message равны None в search_track")
-        return
-
-    query = update.message.text.strip().split('/search ', 1)[1]
+async def search_track_or_album(message: Message, context: CallbackContext, query: str) -> None:
     if not query:
-        await update.message.reply_text("Пожалуйста, введите поисковый запрос после '/search'.")
+        await message.reply_text("Пожалуйста, введите поисковый запрос.")
         return
     print(f"Поисковый запрос: {query}")
 
@@ -148,24 +150,22 @@ async def search_track_or_album(update: Update, context: CallbackContext) -> Non
             for album in search_result.albums.results[:5]:
                 button = InlineKeyboardButton(
                     text=f"Альбом: {album.title} - {', '.join([artist.name for artist in album.artists])}",
-                    callback_data=f"album_{album.id}"  # Добавляем префикс "album_" для идентификации
+                    callback_data=f"album_{album.id}"
                 )
                 keyboard.append([button])
 
         if keyboard:
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text("Результаты поиска:", reply_markup=reply_markup)
+            await message.reply_text("Результаты поиска:", reply_markup=reply_markup)
         else:
-            await update.message.reply_text("К сожалению, ничего не найдено.")
+            await message.reply_text("К сожалению, ничего не найдено.")
 
     except Exception as e:
-        await update.message.reply_text(f"Ошибка поиска: {e}")
+        await message.reply_text(f"Ошибка поиска: {e}")
         print(f"Ошибка поиска: {e}")
 
-
-
 async def handle_message_or_callback(update: Update, context: CallbackContext) -> None:
-    if isinstance(update, Update) and isinstance(update.callback_query, CallbackQuery):
+    if update.callback_query:
         query = update.callback_query
         message = query.message
         await query.answer()
@@ -175,30 +175,28 @@ async def handle_message_or_callback(update: Update, context: CallbackContext) -
             await send_album_tracks(message, context, album_id)
         else:
             await download_and_send_track(message, context, data)
-    elif isinstance(update, Update) and isinstance(update.message, Message):
+    elif update.message:
         message = update.message
-        track_id = extract_track_id(message.text)
-        album_id = extract_album_id(message.text)
-        if album_id:  # Сначала проверяем album_id
-            await send_album_tracks(message, context, album_id)
-        elif track_id:  # Затем проверяем track_id
+        text = message.text.strip()
+        track_id = extract_track_id(text)
+        album_id = extract_album_id(text)
+        if track_id:
             await download_and_send_track(message, context, track_id)
+        elif album_id:
+            await send_album_tracks(message, context, album_id)
         else:
-            await message.reply_text("Не удалось извлечь ID трека или альбома.")
+            await search_track_or_album(message, context, text)
     else:
         return
-
 
 def main() -> None:
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", lambda update, context: update.message.reply_text("Привет! Отправьте ссылку на трек или альбом Яндекс.Музыки или используйте команду /search <запрос>.")))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'/search .+'), search_track_or_album))
+    app.add_handler(CommandHandler("start", lambda update, context: update.message.reply_text("Привет! Отправьте ссылку на трек или альбом Яндекс.Музыки или просто введите поисковый запрос.")))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_or_callback))
     app.add_handler(CallbackQueryHandler(handle_message_or_callback))
 
     app.run_polling()
-
 
 if __name__ == '__main__':
     main()
