@@ -24,7 +24,7 @@ mutagen
 
 Протестировать: https://t.me/musicyanagl8_bot
 
-Также, вам понадобится получить токен Яндекс.Музыки, как это сделать, подробно описано [в документации библиотеки](https://yandex-music.readthedocs.io/en/main/token.html)
+Для того, чтобы поднять своего бота на основе этого кода, вам понадобится получить токен Яндекс.Музыки, как это сделать, подробно описано [в документации библиотеки](https://yandex-music.readthedocs.io/en/main/token.html)
 
 Библиотека [Yandex Music API на GitHub](https://github.com/MarshalX/yandex-music-api)
 
