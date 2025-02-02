@@ -26,4 +26,8 @@ mutagen
 
 Также, вам понадобится получить токен Яндекс.Музыки, как это сделать, подробно описано [в документации библиотеки](https://yandex-music.readthedocs.io/en/main/token.html)
 
-@MarshalX/yandex-music-api cпасибо!
+Библиотека [Yandex Music API на GitHub](https://github.com/MarshalX/yandex-music-api)
+
+# Вклад
+
+Если вы хотите внести вклад в развитие проекта — приветствуются pull request’ы, а также предложения по улучшению функционала через [Issues](https://github.com/litium020/YAMABot/issues).
